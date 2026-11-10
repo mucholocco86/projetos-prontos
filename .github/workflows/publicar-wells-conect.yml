@@ -1,0 +1,95 @@
+name: Arquivar WELLS CONECT definitivo
+run-name: Publicar backup permanente WELLS CONECT (Qt6 + scrcpy 5.0.1)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publicar-wells-conect.yml']
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-2022
+    timeout-minutes: 100
+    steps:
+      - name: Obter catálogo de projetos prontos
+        uses: actions/checkout@v4
+      - name: Obter versão aprovada do programa (código e ícone)
+        uses: actions/checkout@v4
+        with:
+          repository: mucholocco86/fisicos
+          ref: 578e09882ac3410f0fd4a5f04e51345dcb435ec6
+          path: wells-src
+          persist-credentials: false
+      - name: Instalar Qt 6 e ferramentas
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          arch: win64_msvc2022_64
+          modules: 'qtmultimedia qt5compat'
+          cache: true
+      - name: Incorporar ícone aprovado ao executável
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          python -m pip install --disable-pip-version-check Pillow
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          @'
+          from pathlib import Path
+          from PIL import Image
+          res=Path("wells-src/upstream/QtScrcpy/QtScrcpy/res")
+          source=res/"wells_connect_icon.png"
+          if not source.exists(): raise RuntimeError("Arte do ícone ausente")
+          original=Image.open(source).convert("RGBA")
+          large=original.resize((256,256),Image.Resampling.LANCZOS)
+          large.save(res/"QtScrcpy.ico",format="ICO",sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])
+          original.save(res/"image/tray/logo.png",format="PNG")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Compilar código original WELLS CONECT (não launcher)
+        shell: pwsh
+        run: |
+          cmake -S wells-src/upstream/QtScrcpy -B wells-build -G "Visual Studio 17 2022" -A x64 -DQT_DESIRED_VERSION=6 -DCMAKE_PREFIX_PATH="$env:QT_ROOT_DIR"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build wells-build --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Empacotar programa e servidor scrcpy 5.0.1
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $exe=Get-ChildItem wells-src/upstream/QtScrcpy/output -Filter QtScrcpy.exe -Recurse | Select-Object -First 1
+          if (!$exe) { throw 'Executável QtScrcpyCore real ausente' }
+          New-Item -ItemType Directory dist -Force | Out-Null
+          Copy-Item "$($exe.Directory.FullName)/*" dist -Recurse -Force
+          Rename-Item dist/QtScrcpy.exe WellsConect.exe
+          Copy-Item wells-src/upstream/QtScrcpy/config dist/config -Recurse -Force
+          Copy-Item wells-src/upstream/QtScrcpy/keymap dist/keymap -Recurse -Force
+          Copy-Item wells-src/upstream/QtScrcpy/QtScrcpy/QtScrcpyCore/src/third_party/adb/win/* dist -Force
+          Copy-Item wells-src/upstream/QtScrcpy/QtScrcpy/res/wells_connect_icon.png dist/WELLS_CONECT_ICON.png
+          Copy-Item wells-src/upstream/QtScrcpy/QtScrcpy/res/QtScrcpy.ico dist/WELLS_CONECT_ICON.ico
+          $serverZip=Join-Path $env:RUNNER_TEMP 'scrcpy-5.0.1.zip'
+          Invoke-WebRequest -Uri 'https://github.com/Genymobile/scrcpy/releases/download/v5.0.1/scrcpy-win64-v5.0.1.zip' -OutFile $serverZip
+          Expand-Archive $serverZip (Join-Path $env:RUNNER_TEMP 'scrcpy-5.0.1') -Force
+          $server=Get-ChildItem (Join-Path $env:RUNNER_TEMP 'scrcpy-5.0.1') -Filter scrcpy-server -File -Recurse | Select-Object -First 1
+          if (!$server -or $server.Length -lt 100000) { throw 'Servidor scrcpy 5.0.1 ausente' }
+          Copy-Item $server.FullName dist/scrcpy-server
+          & "$env:QT_ROOT_DIR/bin/windeployqt.exe" --release --compiler-runtime dist/WellsConect.exe
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach($file in @('WellsConect.exe','Qt6Core.dll','Qt6Widgets.dll','Qt6Multimedia.dll','adb.exe','scrcpy-server','WELLS_CONECT_ICON.ico')) {
+            if (!(Test-Path "dist/$file")) { throw "Pacote incompleto: $file" }
+          }
+          if (!(Get-ChildItem dist -Filter 'avcodec-*.dll' -File)) { throw 'FFmpeg ausente' }
+          Get-ChildItem dist -Recurse -File -Include *.lib,*.exp,*.pdb | Remove-Item -Force
+          Compress-Archive -Path 'dist/*' -DestinationPath 'WELLS-CONECT-Windows-Qt6-scrcpy-5.0.1.zip' -CompressionLevel Optimal
+          git -C wells-src archive --format=zip --output="$env:GITHUB_WORKSPACE/WELLS-CONECT-CODIGO-FONTE.zip" HEAD upstream/QtScrcpy
+          if ($LASTEXITCODE -ne 0) { throw 'Falha arquivando o código-fonte' }
+          if (!(Test-Path 'WELLS-CONECT-CODIGO-FONTE.zip')) { throw 'Backup do código ausente' }
+      - name: Criar Release permanente e anexar executável + fontes
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          gh release create wells-conect-v1.0.0 WELLS-CONECT-Windows-Qt6-scrcpy-5.0.1.zip WELLS-CONECT-CODIGO-FONTE.zip --repo mucholocco86/projetos-prontos --title 'WELLS CONECT - Versão definitiva (Qt6 + scrcpy 5.0.1)' --notes-file finalizados/WELLS-CONECT/README.md --latest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
