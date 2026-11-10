@@ -11,7 +11,7 @@
 - **Base funcional aprovada:** `a2439f26e4c79500f0b57f48ffe71aea6bd9d50c` no repositório [fisicos](https://github.com/mucholocco86/fisicos).
 - **Identidade visual:** desenho original WELLS CONECT (monitor, celular e gamepad); atualização visual compilada na branch [release/wells-conect-icone-definitivo](https://github.com/mucholocco86/fisicos/tree/release/wells-conect-icone-definitivo).
 - **Código de desenvolvimento:** [mucholocco86/fisicos](https://github.com/mucholocco86/fisicos).
-- **Download portátil:** consultar [Releases deste repositório](https://github.com/mucholocco86/projetos-prontos/releases) quando publicada a versão com o ícone definitivo.
+- **Download portátil definitivo:** [WELLS CONECT para Windows (ZIP)](https://github.com/mucholocco86/projetos-prontos/releases/download/wells-conect-v1.0.0/WELLS-CONECT-Windows-Qt6-scrcpy-5.0.1.zip).\n- **Backup completo do código-fonte:** [WELLS CONECT — código-fonte (ZIP)](https://github.com/mucholocco86/projetos-prontos/releases/download/wells-conect-v1.0.0/WELLS-CONECT-CODIGO-FONTE.zip).\n- **Release:** [wells-conect-v1.0.0](https://github.com/mucholocco86/projetos-prontos/releases/tag/wells-conect-v1.0.0).
 
 O executável portátil deve ser distribuído **com todas as DLLs e dependências**, não isoladamente. Não substituir o arquivo ZIP pelo executável sozinho.
 
