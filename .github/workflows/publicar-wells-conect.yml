@@ -1,5 +1,5 @@
 name: Publicar WELLS CONECT final aprovado
-run-name: Publicar WELLS CONECT com Wells Audio aprovado
+run-name: Sincronizar release final WELLS CONECT e documentação
 on:
   workflow_dispatch:
   push:
