@@ -1,5 +1,5 @@
-name: Arquivar WELLS CONECT final aprovado
-run-name: Publicar somente WELLS CONECT aprovado (compilação 49)
+name: Publicar WELLS CONECT final aprovado
+run-name: Publicar WELLS CONECT com Wells Audio aprovado
 on:
   workflow_dispatch:
   push:
@@ -15,14 +15,14 @@ jobs:
     steps:
       - name: Obter catálogo
         uses: actions/checkout@v4
-      - name: Obter fontes EXATAS da versão aprovada
+      - name: Obter código-fonte exato da versão aprovada
         uses: actions/checkout@v4
         with:
           repository: mucholocco86/fisicos
-          ref: 68615d07d4e5d28dc28423db329f8501e8e2f831
+          ref: 5cb2452291f85c40245048b2b67598b2a004fb94
           path: wells-src
           persist-credentials: false
-      - name: Baixar pacote compilado e aprovado, sem recompilar
+      - name: Baixar pacote Windows e APK já compilados e testados
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -31,18 +31,19 @@ jobs:
           curl --fail --location --retry 3 \
             -H "Authorization: Bearer $GH_TOKEN" \
             -H "Accept: application/vnd.github+json" \
-            "https://api.github.com/repos/mucholocco86/fisicos/actions/artifacts/13837826459/zip" \
+            "https://api.github.com/repos/mucholocco86/fisicos/actions/artifacts/13985769985/zip" \
             --output WELLS-CONECT-Windows-Qt6-scrcpy-5.0.1.zip
-          echo "Validando ZIP do build #49..."
           unzip -t WELLS-CONECT-Windows-Qt6-scrcpy-5.0.1.zip >/dev/null
-          for item in WellsConect.exe sndcpy.apk sndcpy.bat Qt6Core.dll Qt6Multimedia.dll adb.exe scrcpy-server WELLS_CONECT_ICON.ico; do
+          for item in WellsConect.exe wells-audio.apk wells_audio.bat Qt6Multimedia.dll adb.exe scrcpy-server; do
             unzip -Z -1 WELLS-CONECT-Windows-Qt6-scrcpy-5.0.1.zip | grep -Fxq "$item" || { echo "Faltando: $item"; exit 1; }
           done
-          sha256sum WELLS-CONECT-Windows-Qt6-scrcpy-5.0.1.zip
-          git -C wells-src archive --format=zip --output="$GITHUB_WORKSPACE/WELLS-CONECT-CODIGO-FONTE.zip" HEAD upstream/QtScrcpy .github/workflows/wells-core-qt6.yml
+          if unzip -Z -1 WELLS-CONECT-Windows-Qt6-scrcpy-5.0.1.zip | grep -Eq '^(sndcpy.apk|sndcpy.bat)$'; then
+            echo "Arquivos sndcpy antigos indevidamente presentes"; exit 1
+          fi
+          git -C wells-src archive --format=zip --output="$GITHUB_WORKSPACE/WELLS-CONECT-CODIGO-FONTE.zip" HEAD upstream/QtScrcpy wells-audio-android .github/workflows/wells-audio-package.yml .github/workflows/wells-audio-android.yml
           unzip -t WELLS-CONECT-CODIGO-FONTE.zip >/dev/null
-          echo "Artefato e fontes do commit aprovado verificados."
-      - name: Atualizar a única publicação oficial, substituindo arquivos antigos
+          sha256sum WELLS-CONECT-Windows-Qt6-scrcpy-5.0.1.zip WELLS-CONECT-CODIGO-FONTE.zip
+      - name: Substituir a publicação oficial vigente
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -54,7 +55,7 @@ jobs:
             --clobber --repo mucholocco86/projetos-prontos
           gh release edit wells-conect-v1.0.0 \
             --repo mucholocco86/projetos-prontos \
-            --title 'WELLS CONECT — versão final aprovada (Qt6 + áudio sincronizado)' \
+            --title 'WELLS CONECT — final aprovado com Wells Audio' \
             --notes-file finalizados/WELLS-CONECT/README.md \
             --latest
           gh release view wells-conect-v1.0.0 --repo mucholocco86/projetos-prontos --json assets,url
